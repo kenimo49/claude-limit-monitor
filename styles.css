@@ -159,6 +159,7 @@ header h1 {
 }
 
 .unknown { color: #374151; }
+.unused  { color: #374151; }
 
 .bar-wrap {
   height: 4px;

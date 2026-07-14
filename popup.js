@@ -52,13 +52,19 @@ function renderLimit(label, utilization, used, limit, resetAt, hoursRemaining) {
   const barHtml = utilization != null ? renderBar(utilization) : renderBarAbsolute(used, limit);
   const countdown = formatCountdown(resetAt);
   const countdownText = countdown || (hoursRemaining != null ? `約${hoursRemaining}時間後` : null);
+  // utilization が 0% かつ reset 時刻なし → まだ使っていないウィンドウ
+  const isUnused = (utilization === 0 || utilization === null) && !resetAt && !hoursRemaining;
+  const resetDisplay = isUnused
+    ? '<span class="unused">未使用</span>'
+    : countdownText
+      ? `🔄 ${countdownText}`
+      : '<span class="unknown">取得中…</span>';
+
   return `
     <div class="limit-block">
       <div class="limit-row">
         <span class="limit-title">${label}</span>
-        <span class="limit-reset">${countdownText
-          ? `🔄 ${countdownText}`
-          : '<span class="unknown">取得中…</span>'}</span>
+        <span class="limit-reset">${resetDisplay}</span>
       </div>
       ${barHtml}
     </div>`;

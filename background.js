@@ -163,11 +163,9 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
       }
       key = composite;
     } else if (orgId) {
-      // 既に複合キーが存在する場合はそちらを更新（仮キーを作らない）
-      const existing = Object.keys(accounts).find(
-        (k) => k.startsWith(orgId.slice(0, 8) + ":") && accounts[k].org_id === orgId
-      );
-      key = existing || `org:${orgId.slice(0, 8)}`;
+      // userIDなし → 仮キー（既存の複合キーは絶対に触らない）
+      // /api/account のuserIDが届いたら複合キーに昇格される
+      key = `org:${orgId.slice(0, 8)}`;
     } else if (email) {
       key = email;
     } else {
