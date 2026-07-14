@@ -31,7 +31,20 @@ function formatLastSeen(ms) {
 
 // ---- レンダリング ----
 
-function renderBar(used, limit) {
+function renderBar(pct) {
+  if (pct == null) return "";
+  const clamped = Math.min(100, Math.max(0, Math.round(pct)));
+  const cls = clamped >= 85 ? "danger" : clamped >= 55 ? "warning" : "";
+  return `
+    <div class="bar-wrap">
+      <div class="bar-fill ${cls}" style="width:${clamped}%"></div>
+    </div>
+    <div class="bar-label">${clamped}% 使用中</div>
+  `;
+}
+
+// used/limit の絶対値がある場合のバー（旧来の構造用フォールバック）
+function renderBarAbsolute(used, limit) {
   if (used == null || !limit) return "";
   const pct = Math.min(100, Math.round((used / limit) * 100));
   const cls = pct >= 85 ? "danger" : pct >= 55 ? "warning" : "";
@@ -43,7 +56,13 @@ function renderBar(used, limit) {
   `;
 }
 
-function renderLimit(label, used, limit, resetAt, hoursRemaining) {
+function renderLimit(label, utilization, used, limit, resetAt, hoursRemaining) {
+  // utilization(%) があればそれを優先、なければ絶対値から計算
+  const barHtml =
+    utilization != null
+      ? renderBar(utilization)
+      : renderBarAbsolute(used, limit);
+
   const countdown = formatCountdown(resetAt);
   const countdownText =
     countdown ||
@@ -52,9 +71,11 @@ function renderLimit(label, used, limit, resetAt, hoursRemaining) {
   return `
     <div class="limit-block">
       <div class="limit-title">${label}</div>
-      ${renderBar(used, limit)}
+      ${barHtml}
       <div class="reset-row">
-        ${countdownText ? `🔄 <span class="reset-time">${countdownText}にリセット</span>` : '<span class="unknown">リセット時刻取得中…</span>'}
+        ${countdownText
+          ? `🔄 <span class="reset-time">${countdownText}にリセット</span>`
+          : '<span class="unknown">リセット時刻取得中…</span>'}
       </div>
     </div>
   `;
@@ -64,9 +85,8 @@ function renderAccount(key, acc) {
   const div = document.createElement("div");
   div.className = "card";
 
-  const label = acc.email || key;
-  const shortLabel =
-    label.length > 30 ? label.substring(0, 28) + "…" : label;
+  const label = acc.email || acc.name || key;
+  const shortLabel = label.length > 30 ? label.substring(0, 28) + "…" : label;
 
   div.innerHTML = `
     <div class="card-header">
@@ -77,23 +97,23 @@ function renderAccount(key, acc) {
 
     ${renderLimit(
       "5時間リミット",
-      acc.five_hour_used,
-      acc.five_hour_limit,
-      acc.five_hour_reset_at,
-      acc.five_hour_hours_remaining
+      acc.five_hour_utilization ?? null,
+      acc.five_hour_used ?? null,
+      acc.five_hour_limit ?? null,
+      acc.five_hour_reset_at ?? null,
+      acc.five_hour_hours_remaining ?? null
     )}
 
-    ${
-      acc.weekly_limit || acc.weekly_reset_at
-        ? renderLimit(
-            "週次リミット",
-            acc.weekly_used,
-            acc.weekly_limit,
-            acc.weekly_reset_at,
-            null
-          )
-        : ""
-    }
+    ${acc.weekly_reset_at || acc.weekly_utilization != null
+      ? renderLimit(
+          "週次リミット (7日間)",
+          acc.weekly_utilization ?? null,
+          acc.weekly_used ?? null,
+          acc.weekly_limit ?? null,
+          acc.weekly_reset_at ?? null,
+          null
+        )
+      : ""}
   `;
 
   return div;
@@ -136,8 +156,8 @@ if (typeof document !== "undefined" && document.getElementById) {
     const output = document.getElementById("debug-output");
     panel.classList.toggle("hidden");
     if (!panel.classList.contains("hidden")) {
-      const result = await chrome.storage.local.get(STORAGE_KEY);
-      output.textContent = JSON.stringify(result[STORAGE_KEY] || {}, null, 2);
+      const result = await chrome.storage.local.get(null); // すべて取得
+      output.textContent = JSON.stringify(result, null, 2);
     }
   });
 

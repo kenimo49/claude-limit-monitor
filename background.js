@@ -29,9 +29,28 @@ function findName(data) {
   );
 }
 
+// /api/organizations/{id}/usage のURLからorg IDを抽出
+function findOrgId(url) {
+  if (!url) return null;
+  const m = url.match(/\/organizations\/([a-f0-9-]{36})\//);
+  return m ? m[1] : null;
+}
+
 function findUsage(data) {
   if (!data || typeof data !== "object") return null;
 
+  // claude.ai の実際のレスポンス構造:
+  // { five_hour: { utilization, resets_at }, seven_day: { utilization, resets_at } }
+  if (data.five_hour != null || data.seven_day != null) {
+    return {
+      five_hour_utilization: data.five_hour?.utilization ?? null,
+      five_hour_reset_at: toMs(data.five_hour?.resets_at),
+      weekly_utilization: data.seven_day?.utilization ?? null,
+      weekly_reset_at: toMs(data.seven_day?.resets_at),
+    };
+  }
+
+  // フォールバック: 旧来の構造（rate_limits, usage, tokensなど）
   const str = JSON.stringify(data).toLowerCase();
   if (
     !str.includes("limit") &&
@@ -42,43 +61,16 @@ function findUsage(data) {
     return null;
   }
 
-  // claude.aiが返す可能性のある様々な構造に対応
-  const fiveHourUsed =
-    data.usage?.five_hour?.used ??
-    data.rate_limits?.five_hour?.used ??
-    data.limits?.five_hour?.used ??
-    data.tokens_used ??
-    data.usage_count;
-
-  const fiveHourLimit =
-    data.usage?.five_hour?.limit ??
-    data.rate_limits?.five_hour?.limit ??
-    data.limits?.five_hour?.limit ??
-    data.tokens_limit ??
-    data.usage_limit;
-
   const fiveHourResetAt = toMs(
     data.usage?.five_hour?.reset_at ??
     data.rate_limits?.five_hour?.reset_at ??
-    data.limits?.five_hour?.reset_at ??
     data.reset_at ??
     data.rate_limit_reset_at
   );
 
-  const weeklyUsed =
-    data.usage?.weekly?.used ??
-    data.weekly_usage?.used ??
-    data.limits?.weekly?.used;
-
-  const weeklyLimit =
-    data.usage?.weekly?.limit ??
-    data.weekly_usage?.limit ??
-    data.limits?.weekly?.limit;
-
   const weeklyResetAt = toMs(
     data.usage?.weekly?.reset_at ??
-    data.weekly_usage?.reset_at ??
-    data.limits?.weekly?.reset_at
+    data.weekly_usage?.reset_at
   );
 
   const plan =
@@ -88,23 +80,11 @@ function findUsage(data) {
     data.account?.plan ??
     data.user?.plan;
 
-  const hasAnything =
-    fiveHourUsed != null ||
-    fiveHourLimit != null ||
-    fiveHourResetAt != null ||
-    weeklyUsed != null ||
-    weeklyLimit != null ||
-    weeklyResetAt != null ||
-    plan != null;
-
+  const hasAnything = fiveHourResetAt != null || weeklyResetAt != null || plan != null;
   if (!hasAnything) return null;
 
   return {
-    ...(fiveHourUsed != null ? { five_hour_used: fiveHourUsed } : {}),
-    ...(fiveHourLimit != null ? { five_hour_limit: fiveHourLimit } : {}),
     ...(fiveHourResetAt != null ? { five_hour_reset_at: fiveHourResetAt } : {}),
-    ...(weeklyUsed != null ? { weekly_used: weeklyUsed } : {}),
-    ...(weeklyLimit != null ? { weekly_limit: weeklyLimit } : {}),
     ...(weeklyResetAt != null ? { weekly_reset_at: weeklyResetAt } : {}),
     ...(plan != null ? { plan: String(plan) } : {}),
   };
@@ -128,6 +108,8 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
       handleAPIData(message.payload);
     } else if (message.type === "DOM_DATA") {
       handleDOMData(message.payload);
+    } else if (message.type === "LOG_URL") {
+      logUrl(message.url);
     } else if (message.type === "GET_ACCOUNTS") {
       getAccounts().then(sendResponse);
       return true;
@@ -137,14 +119,16 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
   async function handleAPIData({ url, data }) {
     const email = findEmail(data);
     const usage = findUsage(data);
+    const orgId = findOrgId(url);
 
-    if (!email && !usage) return;
+    if (!email && !usage && !orgId) return;
 
     const accounts = await getAccounts();
 
-    // メールがあればそれをキーに。なければ直近アカウントを更新
+    // キー優先度: email > org ID > 直近アカウント > 新規
     const key =
       email ||
+      (orgId ? `org:${orgId.slice(0, 8)}` : null) ||
       Object.keys(accounts).sort(
         (a, b) => (accounts[b].last_seen || 0) - (accounts[a].last_seen || 0)
       )[0] ||
@@ -153,6 +137,7 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     accounts[key] = {
       ...accounts[key],
       ...(email ? { email } : {}),
+      ...(orgId ? { org_id: orgId } : {}),
       ...(findName(data) ? { name: findName(data) } : {}),
       ...(usage || {}),
       last_seen: Date.now(),
@@ -181,6 +166,13 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
   }
 
+  async function logUrl(url) {
+    const result = await chrome.storage.local.get("_debug_urls");
+    const urls = result._debug_urls || [];
+    urls.unshift(url);
+    await chrome.storage.local.set({ _debug_urls: urls.slice(0, 30) });
+  }
+
   async function getAccounts() {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     return result[STORAGE_KEY] || {};
@@ -188,5 +180,5 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { findEmail, findName, findUsage, toMs };
+  module.exports = { findEmail, findName, findUsage, findOrgId, toMs };
 }

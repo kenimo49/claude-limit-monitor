@@ -91,50 +91,46 @@ describe("formatLastSeen", () => {
   });
 });
 
-// ---- renderBar ----
+// ---- renderBar（utilization % を受け取る新API）----
 
 describe("renderBar", () => {
-  test("usedがnullなら空文字を返す", () => {
-    expect(renderBar(null, 100)).toBe("");
-  });
-
-  test("limitが0やnullなら空文字を返す", () => {
-    expect(renderBar(50, null)).toBe("");
-    expect(renderBar(50, 0)).toBe("");
+  test("nullは空文字を返す", () => {
+    expect(renderBar(null)).toBe("");
+    expect(renderBar(undefined)).toBe("");
   });
 
   test("0%でclassなし", () => {
-    const html = renderBar(0, 100);
+    const html = renderBar(0);
     expect(html).toContain('style="width:0%"');
     expect(html).not.toContain("warning");
     expect(html).not.toContain("danger");
   });
 
   test("54%でclassなし", () => {
-    const html = renderBar(54, 100);
+    const html = renderBar(54);
     expect(html).toContain('style="width:54%"');
     expect(html).not.toContain("warning");
     expect(html).not.toContain("danger");
   });
 
   test("55%でwarning", () => {
-    const html = renderBar(55, 100);
+    const html = renderBar(55);
     expect(html).toContain("warning");
     expect(html).not.toContain("danger");
   });
 
   test("85%でdanger", () => {
-    const html = renderBar(85, 100);
+    const html = renderBar(85);
     expect(html).toContain("danger");
   });
 
   test("100%超えは100%にクランプされる", () => {
-    const html = renderBar(120, 100);
+    const html = renderBar(120);
     expect(html).toContain('style="width:100%"');
   });
 
   test("パーセント表示がラベルに含まれる", () => {
-    const html = renderBar(30, 100);
-    expect(html).toContain("30%");
+    const html = renderBar(18); // 実際のutilization値
+    expect(html).toContain("18%");
   });
 });

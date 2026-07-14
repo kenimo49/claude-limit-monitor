@@ -4,7 +4,12 @@
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (!event.data || event.data.source !== "claude_monitor") return;
-  chrome.runtime.sendMessage({ type: "API_DATA", payload: event.data });
+
+  if (event.data.type === "ALL_URLS") {
+    chrome.runtime.sendMessage({ type: "LOG_URL", url: event.data.url });
+  } else if (event.data.type === "API_RESPONSE") {
+    chrome.runtime.sendMessage({ type: "API_DATA", payload: event.data });
+  }
 });
 
 // DOMに「X時間後にリセット」などのテキストが出たときに取得
@@ -16,7 +21,7 @@ function extractDOMUsageData() {
     /(?:resets?|refreshes?|available\s+again|renews?)\s+in\s+(\d+)\s*h(?:our)?s?/i,
     // "2 hours until reset"
     /(\d+)\s*h(?:our)?s?\s+until\s+(?:reset|refresh)/i,
-    // "Usage resets in 3h 20m" のような形式
+    // "Usage resets in 3h 20m"
     /usage\s+resets?\s+in\s+(\d+)h\s*(\d+)?m?/i,
   ];
 
@@ -28,14 +33,17 @@ function extractDOMUsageData() {
       const resetAt = Date.now() + (hours * 60 + minutes) * 60 * 1000;
       chrome.runtime.sendMessage({
         type: "DOM_DATA",
-        payload: { reset_at_ms: resetAt, hours_remaining: hours, minutes_remaining: minutes },
+        payload: {
+          reset_at_ms: resetAt,
+          hours_remaining: hours,
+          minutes_remaining: minutes,
+        },
       });
       break;
     }
   }
 }
 
-// 初回 + DOM変化時に実行
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", extractDOMUsageData);
 } else {

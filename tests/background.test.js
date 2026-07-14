@@ -1,4 +1,4 @@
-const { findEmail, findName, findUsage, toMs } = require("../background");
+const { findEmail, findName, findUsage, findOrgId, toMs } = require("../background");
 
 // ---- toMs ----
 
@@ -21,8 +21,30 @@ describe("toMs", () => {
     expect(toMs(iso)).toBe(new Date(iso).getTime());
   });
 
+  test("タイムゾーンオフセット付きISO文字列を変換する", () => {
+    const iso = "2026-07-14T18:20:00.012186+00:00";
+    expect(toMs(iso)).toBe(new Date(iso).getTime());
+  });
+
   test("無効な文字列はnullを返す", () => {
     expect(toMs("not-a-date")).toBeNull();
+  });
+});
+
+// ---- findOrgId ----
+
+describe("findOrgId", () => {
+  test("標準的なURLからorg IDを抽出する", () => {
+    const url = "https://claude.ai/api/organizations/453ec18a-f95c-4fb7-a18c-c84b681a50df/usage";
+    expect(findOrgId(url)).toBe("453ec18a-f95c-4fb7-a18c-c84b681a50df");
+  });
+
+  test("organizationsを含まないURLはnullを返す", () => {
+    expect(findOrgId("https://claude.ai/api/account")).toBeNull();
+  });
+
+  test("nullはnullを返す", () => {
+    expect(findOrgId(null)).toBeNull();
   });
 });
 
@@ -88,91 +110,88 @@ describe("findName", () => {
   });
 });
 
-// ---- findUsage ----
+// ---- findUsage（実際のclaude.ai構造）----
 
-describe("findUsage", () => {
+describe("findUsage — claude.ai /api/organizations/{id}/usage", () => {
+  const ACTUAL_RESPONSE = {
+    five_hour: {
+      utilization: 18,
+      resets_at: "2026-07-14T18:20:00.012186+00:00",
+      limit_dollars: null,
+      used_dollars: null,
+      remaining_dollars: null,
+    },
+    seven_day: {
+      utilization: 27,
+      resets_at: "2026-07-19T21:00:00.012208+00:00",
+      limit_dollars: null,
+      used_dollars: null,
+      remaining_dollars: null,
+    },
+    limits: [
+      { kind: "session", group: "session", percent: 18, severity: "normal",
+        resets_at: "2026-07-14T18:20:00.012186+00:00", is_active: false },
+      { kind: "weekly_all", group: "weekly", percent: 27, severity: "normal",
+        resets_at: "2026-07-19T21:00:00.012208+00:00", is_active: true },
+    ],
+  };
+
+  test("five_hour.utilization を正しく抽出する", () => {
+    const r = findUsage(ACTUAL_RESPONSE);
+    expect(r.five_hour_utilization).toBe(18);
+  });
+
+  test("five_hour.resets_at をmsに変換して返す", () => {
+    const r = findUsage(ACTUAL_RESPONSE);
+    expect(r.five_hour_reset_at).toBe(
+      new Date("2026-07-14T18:20:00.012186+00:00").getTime()
+    );
+  });
+
+  test("seven_day.utilization を weekly_utilization として返す", () => {
+    const r = findUsage(ACTUAL_RESPONSE);
+    expect(r.weekly_utilization).toBe(27);
+  });
+
+  test("seven_day.resets_at を weekly_reset_at として返す", () => {
+    const r = findUsage(ACTUAL_RESPONSE);
+    expect(r.weekly_reset_at).toBe(
+      new Date("2026-07-19T21:00:00.012208+00:00").getTime()
+    );
+  });
+
   test("nullはnullを返す", () => {
     expect(findUsage(null)).toBeNull();
   });
 
-  test("limit/usage/reset/remainingを一切含まないデータはnullを返す", () => {
+  test("five_hour/seven_dayを含まない無関係なデータはnullを返す", () => {
+    expect(findUsage({ name: "ken", org: "propel" })).toBeNull();
+  });
+
+  test("five_hour のみのデータも抽出できる", () => {
+    const r = findUsage({ five_hour: { utilization: 50, resets_at: "2026-07-14T18:20:00Z" } });
+    expect(r.five_hour_utilization).toBe(50);
+    expect(r.weekly_utilization).toBeNull();
+  });
+});
+
+// ---- findUsage（フォールバック構造）----
+
+describe("findUsage — フォールバック構造", () => {
+  test("rate_limits.five_hour 構造でresets_atを返す", () => {
+    const data = {
+      rate_limits: { five_hour: { reset_at: 1_700_000_000 } },
+    };
+    const r = findUsage(data);
+    expect(r.five_hour_reset_at).toBe(1_700_000_000_000);
+  });
+
+  test("limit/usage/reset/remainingを含まないデータはnullを返す", () => {
     expect(findUsage({ email: "ken@example.com", name: "ken" })).toBeNull();
   });
 
-  test("usage.five_hour 構造を正しく抽出する", () => {
-    const data = {
-      usage: {
-        five_hour: { used: 30, limit: 100, reset_at: 1_700_000_000 },
-      },
-    };
-    const result = findUsage(data);
-    expect(result.five_hour_used).toBe(30);
-    expect(result.five_hour_limit).toBe(100);
-    expect(result.five_hour_reset_at).toBe(1_700_000_000_000);
-  });
-
-  test("rate_limits.five_hour 構造を正しく抽出する", () => {
-    const data = {
-      rate_limits: {
-        five_hour: { used: 10, limit: 50, reset_at: 1_700_000_000 },
-      },
-    };
-    const result = findUsage(data);
-    expect(result.five_hour_used).toBe(10);
-    expect(result.five_hour_limit).toBe(50);
-  });
-
-  test("フラットな tokens_used / tokens_limit を抽出する", () => {
-    const data = { tokens_used: 500, tokens_limit: 2000, reset_at: "2025-01-01T05:00:00Z" };
-    const result = findUsage(data);
-    expect(result.five_hour_used).toBe(500);
-    expect(result.five_hour_limit).toBe(2000);
-    expect(result.five_hour_reset_at).toBe(new Date("2025-01-01T05:00:00Z").getTime());
-  });
-
-  test("usage.weekly 構造を正しく抽出する", () => {
-    const data = {
-      usage: {
-        weekly: { used: 200, limit: 1000, reset_at: 1_700_000_000 },
-      },
-    };
-    const result = findUsage(data);
-    expect(result.weekly_used).toBe(200);
-    expect(result.weekly_limit).toBe(1000);
-    expect(result.weekly_reset_at).toBe(1_700_000_000_000);
-  });
-
-  test("plan を文字列として抽出する", () => {
-    expect(findUsage({ plan: "max_20x", usage: { five_hour: { limit: 100 } } }).plan).toBe("max_20x");
-    expect(findUsage({ subscription: { plan: "pro" }, usage: { five_hour: { limit: 50 } } }).plan).toBe("pro");
-  });
-
   test("数値planはstringに変換される", () => {
-    const result = findUsage({ plan: 5, usage: { five_hour: { limit: 100 } } });
-    expect(result.plan).toBe("5");
-  });
-
-  test("limit/usage/reset/remaining を含まないplanのみのデータはnullを返す（早期リターン）", () => {
-    // 実際のAPIではplanはusage/limitと一緒に来るため、単独planの早期リターンは仕様
-    expect(findUsage({ plan: "pro" })).toBeNull();
-  });
-
-  test("値がnullのフィールドは結果に含まれない", () => {
-    const data = { usage: { five_hour: { used: 10, limit: 100 } } };
-    const result = findUsage(data);
-    expect(result).not.toHaveProperty("five_hour_reset_at");
-    expect(result).not.toHaveProperty("weekly_used");
-  });
-
-  test("limits.five_hour 構造を正しく抽出する", () => {
-    const data = {
-      limits: {
-        five_hour: { used: 7, limit: 45 },
-        weekly: { used: 100, limit: 480 },
-      },
-    };
-    const result = findUsage(data);
-    expect(result.five_hour_used).toBe(7);
-    expect(result.weekly_limit).toBe(480);
+    const data = { plan: 5, reset_at: 1_700_000_000 };
+    expect(findUsage(data).plan).toBe("5");
   });
 });
