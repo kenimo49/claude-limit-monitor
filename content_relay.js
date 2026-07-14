@@ -1,5 +1,5 @@
 // isolatedワールド: MAINワールドからのメッセージをbackgroundへ中継
-// DOMからのリセット時刻テキスト抽出も担当
+// ページロード後にusageエンドポイントをプロアクティブに取得する
 
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
@@ -12,19 +12,48 @@ window.addEventListener("message", (event) => {
   }
 });
 
-// DOMに「X時間後にリセット」などのテキストが出たときに取得
+// cookieからorg IDを取得
+function getOrgIdFromCookie() {
+  const m = document.cookie.match(/lastActiveOrg=([a-f0-9-]{36})/);
+  return m ? m[1] : null;
+}
+
+// usageエンドポイントを直接fetchしてbackgroundへ送る
+async function fetchAndSendUsage(orgId) {
+  try {
+    const url = `/api/organizations/${orgId}/usage`;
+    const res = await fetch(url, { credentials: "same-origin" });
+    if (!res.ok) return;
+    const data = await res.json();
+    chrome.runtime.sendMessage({
+      type: "API_DATA",
+      payload: { source: "claude_monitor", type: "API_RESPONSE", url, data },
+    });
+  } catch (e) {}
+}
+
+// ページロード後に実行
+async function init() {
+  const orgId = getOrgIdFromCookie();
+  if (orgId) {
+    await fetchAndSendUsage(orgId);
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+
+// DOMからのリセット時刻テキスト抽出（フォールバック）
 function extractDOMUsageData() {
   const text = document.body?.innerText || "";
-
   const patterns = [
-    // "resets in 2 hours", "refreshes in 1 hour"
     /(?:resets?|refreshes?|available\s+again|renews?)\s+in\s+(\d+)\s*h(?:our)?s?/i,
-    // "2 hours until reset"
     /(\d+)\s*h(?:our)?s?\s+until\s+(?:reset|refresh)/i,
-    // "Usage resets in 3h 20m"
     /usage\s+resets?\s+in\s+(\d+)h\s*(\d+)?m?/i,
   ];
-
   for (const pat of patterns) {
     const m = text.match(pat);
     if (m) {
@@ -33,21 +62,11 @@ function extractDOMUsageData() {
       const resetAt = Date.now() + (hours * 60 + minutes) * 60 * 1000;
       chrome.runtime.sendMessage({
         type: "DOM_DATA",
-        payload: {
-          reset_at_ms: resetAt,
-          hours_remaining: hours,
-          minutes_remaining: minutes,
-        },
+        payload: { reset_at_ms: resetAt, hours_remaining: hours, minutes_remaining: minutes },
       });
       break;
     }
   }
-}
-
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", extractDOMUsageData);
-} else {
-  extractDOMUsageData();
 }
 
 const observer = new MutationObserver(extractDOMUsageData);
