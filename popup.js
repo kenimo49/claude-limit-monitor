@@ -123,23 +123,28 @@ async function render() {
   }
 }
 
-// ---- イベント ----
+// ---- イベント・初期化（ブラウザ環境のみ） ----
 
-document.getElementById("clear-btn").addEventListener("click", async () => {
-  await chrome.storage.local.remove(STORAGE_KEY);
+if (typeof document !== "undefined" && document.getElementById) {
+  document.getElementById("clear-btn").addEventListener("click", async () => {
+    await chrome.storage.local.remove(STORAGE_KEY);
+    render();
+  });
+
+  document.getElementById("debug-btn").addEventListener("click", async () => {
+    const panel = document.getElementById("debug-panel");
+    const output = document.getElementById("debug-output");
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) {
+      const result = await chrome.storage.local.get(STORAGE_KEY);
+      output.textContent = JSON.stringify(result[STORAGE_KEY] || {}, null, 2);
+    }
+  });
+
   render();
-});
+  setInterval(render, 30000);
+}
 
-document.getElementById("debug-btn").addEventListener("click", async () => {
-  const panel = document.getElementById("debug-panel");
-  const output = document.getElementById("debug-output");
-  panel.classList.toggle("hidden");
-  if (!panel.classList.contains("hidden")) {
-    const result = await chrome.storage.local.get(STORAGE_KEY);
-    output.textContent = JSON.stringify(result[STORAGE_KEY] || {}, null, 2);
-  }
-});
-
-render();
-// 30秒ごとにカウントダウンを更新
-setInterval(render, 30000);
+if (typeof module !== "undefined") {
+  module.exports = { formatCountdown, formatLastSeen, renderBar };
+}

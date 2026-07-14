@@ -1,65 +1,6 @@
 const STORAGE_KEY = "claude_accounts";
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.type === "API_DATA") {
-    handleAPIData(message.payload);
-  } else if (message.type === "DOM_DATA") {
-    handleDOMData(message.payload);
-  } else if (message.type === "GET_ACCOUNTS") {
-    getAccounts().then(sendResponse);
-    return true;
-  }
-});
-
-async function handleAPIData({ url, data }) {
-  const email = findEmail(data);
-  const usage = findUsage(data);
-
-  if (!email && !usage) return;
-
-  const accounts = await getAccounts();
-
-  // メールがあればそれをキーに。なければ直近アカウントを更新
-  const key =
-    email ||
-    Object.keys(accounts).sort(
-      (a, b) => (accounts[b].last_seen || 0) - (accounts[a].last_seen || 0)
-    )[0] ||
-    "account_1";
-
-  accounts[key] = {
-    ...accounts[key],
-    ...(email ? { email } : {}),
-    ...(findName(data) ? { name: findName(data) } : {}),
-    ...(usage || {}),
-    last_seen: Date.now(),
-    // デバッグ用: 最後に取れたURLを残す
-    _debug_url: url,
-  };
-
-  await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
-}
-
-async function handleDOMData(payload) {
-  const accounts = await getAccounts();
-  const entries = Object.entries(accounts).sort(
-    (a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0)
-  );
-
-  if (entries.length === 0) return;
-
-  const [key, existing] = entries[0];
-  accounts[key] = {
-    ...existing,
-    five_hour_reset_at: payload.reset_at_ms,
-    five_hour_hours_remaining: payload.hours_remaining,
-    last_seen: Date.now(),
-  };
-
-  await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
-}
-
-// ---- データ抽出ヘルパー ----
+// ---- データ抽出ヘルパー（純粋関数 — chrome不要）----
 
 function findEmail(data) {
   if (!data || typeof data !== "object") return null;
@@ -179,7 +120,73 @@ function toMs(val) {
   return null;
 }
 
-async function getAccounts() {
-  const result = await chrome.storage.local.get(STORAGE_KEY);
-  return result[STORAGE_KEY] || {};
+// ---- Chrome拡張ランタイム（ブラウザ環境のみ）----
+
+if (typeof chrome !== "undefined" && chrome.runtime) {
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "API_DATA") {
+      handleAPIData(message.payload);
+    } else if (message.type === "DOM_DATA") {
+      handleDOMData(message.payload);
+    } else if (message.type === "GET_ACCOUNTS") {
+      getAccounts().then(sendResponse);
+      return true;
+    }
+  });
+
+  async function handleAPIData({ url, data }) {
+    const email = findEmail(data);
+    const usage = findUsage(data);
+
+    if (!email && !usage) return;
+
+    const accounts = await getAccounts();
+
+    // メールがあればそれをキーに。なければ直近アカウントを更新
+    const key =
+      email ||
+      Object.keys(accounts).sort(
+        (a, b) => (accounts[b].last_seen || 0) - (accounts[a].last_seen || 0)
+      )[0] ||
+      "account_1";
+
+    accounts[key] = {
+      ...accounts[key],
+      ...(email ? { email } : {}),
+      ...(findName(data) ? { name: findName(data) } : {}),
+      ...(usage || {}),
+      last_seen: Date.now(),
+      _debug_url: url,
+    };
+
+    await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
+  }
+
+  async function handleDOMData(payload) {
+    const accounts = await getAccounts();
+    const entries = Object.entries(accounts).sort(
+      (a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0)
+    );
+
+    if (entries.length === 0) return;
+
+    const [key, existing] = entries[0];
+    accounts[key] = {
+      ...existing,
+      five_hour_reset_at: payload.reset_at_ms,
+      five_hour_hours_remaining: payload.hours_remaining,
+      last_seen: Date.now(),
+    };
+
+    await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
+  }
+
+  async function getAccounts() {
+    const result = await chrome.storage.local.get(STORAGE_KEY);
+    return result[STORAGE_KEY] || {};
+  }
+}
+
+if (typeof module !== "undefined") {
+  module.exports = { findEmail, findName, findUsage, toMs };
 }

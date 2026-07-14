@@ -22,6 +22,16 @@ The extension intercepts fetch calls on `claude.ai` to capture usage/limit data 
 
 Data is stored per account (keyed by email) in `chrome.storage.local`. When you switch accounts and log in again, the extension updates that account's entry.
 
+## Development & Testing
+
+```bash
+npm install
+npm test          # run all tests
+npm run test:watch  # watch mode
+```
+
+Tests cover the pure helper functions (`findEmail`, `findUsage`, `toMs`, `formatCountdown`, `formatBar`, etc.) with 51 cases across `tests/background.test.js` and `tests/popup.test.js`. No browser or Chrome API required to run tests.
+
 ## Debugging
 
 Click the **デバッグ** button in the popup to see raw captured data. This helps identify which API endpoints carry the limit info — contributions welcome if you find the exact response shape.
