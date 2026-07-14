@@ -1,4 +1,4 @@
-const { findEmail, findName, findUsage, findOrgId, toMs } = require("../background");
+const { findEmail, findName, findUsage, findOrgId, findUserId, toMs } = require("../background");
 
 // ---- toMs ----
 
@@ -45,6 +45,37 @@ describe("findOrgId", () => {
 
   test("nullはnullを返す", () => {
     expect(findOrgId(null)).toBeNull();
+  });
+});
+
+// ---- findUserId ----
+
+describe("findUserId", () => {
+  const UUID = "dca91ac9-601d-43cf-9e09-42a82f34cc1d";
+
+  test("nullはnullを返す", () => {
+    expect(findUserId(null)).toBeNull();
+  });
+
+  test("トップレベルのidを返す", () => {
+    expect(findUserId({ id: UUID })).toBe(UUID);
+  });
+
+  test("user.idを返す", () => {
+    expect(findUserId({ user: { id: UUID } })).toBe(UUID);
+  });
+
+  test("account_idを返す", () => {
+    expect(findUserId({ account_id: UUID })).toBe(UUID);
+  });
+
+  test("UUID形式でない文字列は無視する", () => {
+    expect(findUserId({ id: "not-a-uuid" })).toBeNull();
+    expect(findUserId({ id: "12345" })).toBeNull();
+  });
+
+  test("IDがなければnullを返す", () => {
+    expect(findUserId({ name: "ken", email: "ken@example.com" })).toBeNull();
   });
 });
 

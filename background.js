@@ -36,6 +36,23 @@ function findOrgId(url) {
   return m ? m[1] : null;
 }
 
+// レスポンスからユーザー固有IDを抽出（同一org内の別ユーザー区別用）
+function findUserId(data) {
+  if (!data || typeof data !== "object") return null;
+  const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+  const candidates = [
+    data.id,
+    data.uuid,
+    data.user_id,
+    data.account_id,
+    data.userId,
+    data.user?.id,
+    data.me?.id,
+    data.account?.id,
+  ];
+  return candidates.find((v) => typeof v === "string" && UUID.test(v)) || null;
+}
+
 function findUsage(data) {
   if (!data || typeof data !== "object") return null;
 
@@ -123,20 +140,34 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
   });
 
   async function handleAPIData({ url, data, org_id_hint }) {
-    const email = findEmail(data);
-    const usage = findUsage(data);
-    // URLから取れなければhintを使う（/api/account などorg IDが入らないURL用）
-    const orgId = findOrgId(url) || org_id_hint || null;
+    const email    = findEmail(data);
+    const usage    = findUsage(data);
+    const userId   = findUserId(data);
+    const orgId    = findOrgId(url) || org_id_hint || null;
 
-    if (!email && !usage && !orgId) return;
+    if (!email && !usage && !orgId && !userId) return;
 
     const accounts = await getAccounts();
 
-    // キー決定: org ID > email
-    // フォールバックで既存アカウントを上書きしない — 特定できない場合はスキップ
+    // ---- キー決定 ----
+    // orgId + userId が揃えば複合キー（同一org内の別ユーザーを区別できる）
+    // orgId のみ → 仮キー "org:XXXXXXXX"（userId が後で来たら昇格させる）
     let key;
-    if (orgId) {
-      key = `org:${orgId.slice(0, 8)}`;
+    if (orgId && userId) {
+      const composite = `${orgId.slice(0, 8)}:${userId.slice(0, 8)}`;
+      // 仮キーにデータが既にあればそちらをマージして削除
+      const tempKey = `org:${orgId.slice(0, 8)}`;
+      if (accounts[tempKey] && !accounts[composite]) {
+        accounts[composite] = { ...accounts[tempKey] };
+        delete accounts[tempKey];
+      }
+      key = composite;
+    } else if (orgId) {
+      // 既に複合キーが存在する場合はそちらを更新（仮キーを作らない）
+      const existing = Object.keys(accounts).find(
+        (k) => k.startsWith(orgId.slice(0, 8) + ":") && accounts[k].org_id === orgId
+      );
+      key = existing || `org:${orgId.slice(0, 8)}`;
     } else if (email) {
       key = email;
     } else {
@@ -145,8 +176,9 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
 
     accounts[key] = {
       ...accounts[key],
-      ...(email ? { email } : {}),
-      ...(orgId ? { org_id: orgId } : {}),
+      ...(email  ? { email }        : {}),
+      ...(orgId  ? { org_id: orgId } : {}),
+      ...(userId ? { user_id: userId } : {}),
       ...(findName(data) ? { name: findName(data) } : {}),
       ...(usage || {}),
       last_seen: Date.now(),
@@ -188,5 +220,5 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { findEmail, findName, findUsage, findOrgId, toMs };
+  module.exports = { findEmail, findName, findUsage, findOrgId, findUserId, toMs };
 }
