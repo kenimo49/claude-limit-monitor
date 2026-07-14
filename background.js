@@ -139,10 +139,11 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     }
   });
 
-  async function handleAPIData({ url, data, org_id_hint }) {
+  async function handleAPIData({ url, data, org_id_hint, user_id_hint }) {
     const email    = findEmail(data);
     const usage    = findUsage(data);
-    const userId   = findUserId(data);
+    // data内のuserIdが取れなければhintを使う（usage endpointはuserIdを返さない）
+    const userId   = findUserId(data) || user_id_hint || null;
     const orgId    = findOrgId(url) || org_id_hint || null;
 
     if (!email && !usage && !orgId && !userId) return;
@@ -166,9 +167,9 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
       // userIDなし → 仮キー（既存の複合キーは絶対に触らない）
       // /api/account のuserIDが届いたら複合キーに昇格される
       key = `org:${orgId.slice(0, 8)}`;
-    } else if (email) {
-      key = email;
     } else {
+      // emailだけでは孤立エントリになるのでスキップ
+      // (orgIdが必ず取れる設計なのでここには来ないはず)
       return;
     }
 
