@@ -1,9 +1,10 @@
 // MAINワールドで動作: fetchを傍受してusage/limit情報を取得する
 // ※ usage と account は content_relay.js のプロアクティブfetchが処理するためスキップ
 (function () {
-  // content_relay.js がプロアクティブに処理するエンドポイントは傍受不要
+  // org スコープのエンドポイントは全て content_relay.js のプロアクティブfetchに任せる
+  // （interceptor が仮キーを作る原因になるため全スキップ）
   const SKIP_PATTERNS = [
-    /\/api\/organizations\/[a-f0-9-]+\/usage/,
+    /\/api\/organizations\//,
     /\/api\/account\b/,
   ];
 

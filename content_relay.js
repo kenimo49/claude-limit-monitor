@@ -65,10 +65,15 @@ async function init() {
   if (usageData) send(`/api/organizations/${orgId}/usage`, usageData, orgId, userId);
 }
 
+// DOMContentLoaded 後に少し待ってから実行（lastActiveOrg cookie 確定を待つ）
+function scheduleInit() {
+  setTimeout(init, 800);
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", init);
+  document.addEventListener("DOMContentLoaded", scheduleInit);
 } else {
-  init();
+  scheduleInit();
 }
 
 // DOMフォールバック（テキストからリセット時刻を取る）

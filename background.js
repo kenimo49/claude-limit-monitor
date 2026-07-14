@@ -156,12 +156,24 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     let key;
     if (orgId && userId) {
       const composite = `${orgId.slice(0, 8)}:${userId.slice(0, 8)}`;
-      // 仮キーにデータが既にあればそちらをマージして削除
-      const tempKey = `org:${orgId.slice(0, 8)}`;
-      if (accounts[tempKey] && !accounts[composite]) {
-        accounts[composite] = { ...accounts[tempKey] };
+      const orgPrefix = orgId.slice(0, 8);
+      const tempKey = `org:${orgPrefix}`;
+
+      // 仮キーがあればデータを吸収してから削除（複合キーが未作成の場合のみ引き継ぎ）
+      if (accounts[tempKey]) {
+        if (!accounts[composite]) {
+          accounts[composite] = { ...accounts[tempKey] };
+        }
         delete accounts[tempKey];
       }
+
+      // 同 org の他の仮キーも掃除（再作成された場合に備えて）
+      for (const k of Object.keys(accounts)) {
+        if (k === `org:${orgPrefix}` && k !== composite) {
+          delete accounts[k];
+        }
+      }
+
       key = composite;
     } else if (orgId) {
       // userIDなし → 仮キー（既存の複合キーは絶対に触らない）
