@@ -113,26 +113,35 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     } else if (message.type === "GET_ACCOUNTS") {
       getAccounts().then(sendResponse);
       return true;
+    } else if (message.type === "SET_LABEL") {
+      setLabel(message.key, message.label).then(sendResponse);
+      return true;
+    } else if (message.type === "DELETE_ACCOUNT") {
+      deleteAccount(message.key).then(sendResponse);
+      return true;
     }
   });
 
-  async function handleAPIData({ url, data }) {
+  async function handleAPIData({ url, data, org_id_hint }) {
     const email = findEmail(data);
     const usage = findUsage(data);
-    const orgId = findOrgId(url);
+    // URLから取れなければhintを使う（/api/account などorg IDが入らないURL用）
+    const orgId = findOrgId(url) || org_id_hint || null;
 
     if (!email && !usage && !orgId) return;
 
     const accounts = await getAccounts();
 
-    // キー優先度: email > org ID > 直近アカウント > 新規
-    const key =
-      email ||
-      (orgId ? `org:${orgId.slice(0, 8)}` : null) ||
-      Object.keys(accounts).sort(
-        (a, b) => (accounts[b].last_seen || 0) - (accounts[a].last_seen || 0)
-      )[0] ||
-      "account_1";
+    // キー決定: org ID > email
+    // フォールバックで既存アカウントを上書きしない — 特定できない場合はスキップ
+    let key;
+    if (orgId) {
+      key = `org:${orgId.slice(0, 8)}`;
+    } else if (email) {
+      key = email;
+    } else {
+      return;
+    }
 
     accounts[key] = {
       ...accounts[key],
@@ -171,6 +180,19 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
     const urls = result._debug_urls || [];
     urls.unshift(url);
     await chrome.storage.local.set({ _debug_urls: urls.slice(0, 30) });
+  }
+
+  async function setLabel(key, label) {
+    const accounts = await getAccounts();
+    if (!accounts[key]) return;
+    accounts[key].display_name = label.trim() || null;
+    await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
+  }
+
+  async function deleteAccount(key) {
+    const accounts = await getAccounts();
+    delete accounts[key];
+    await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
   }
 
   async function getAccounts() {

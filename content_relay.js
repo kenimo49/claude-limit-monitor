@@ -1,10 +1,9 @@
 // isolatedワールド: MAINワールドからのメッセージをbackgroundへ中継
-// ページロード後にusageエンドポイントをプロアクティブに取得する
+// ページロード後にusage + accountエンドポイントをプロアクティブに取得する
 
 window.addEventListener("message", (event) => {
   if (event.source !== window) return;
   if (!event.data || event.data.source !== "claude_monitor") return;
-
   if (event.data.type === "ALL_URLS") {
     chrome.runtime.sendMessage({ type: "LOG_URL", url: event.data.url });
   } else if (event.data.type === "API_RESPONSE") {
@@ -12,32 +11,41 @@ window.addEventListener("message", (event) => {
   }
 });
 
-// cookieからorg IDを取得
 function getOrgIdFromCookie() {
   const m = document.cookie.match(/lastActiveOrg=([a-f0-9-]{36})/);
   return m ? m[1] : null;
 }
 
-// usageエンドポイントを直接fetchしてbackgroundへ送る
-async function fetchAndSendUsage(orgId) {
+async function fetchJSON(url) {
   try {
-    const url = `/api/organizations/${orgId}/usage`;
     const res = await fetch(url, { credentials: "same-origin" });
-    if (!res.ok) return;
-    const data = await res.json();
-    chrome.runtime.sendMessage({
-      type: "API_DATA",
-      payload: { source: "claude_monitor", type: "API_RESPONSE", url, data },
-    });
-  } catch (e) {}
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
 }
 
-// ページロード後に実行
+async function sendToBackground(url, data, orgIdHint = null) {
+  chrome.runtime.sendMessage({
+    type: "API_DATA",
+    payload: { source: "claude_monitor", type: "API_RESPONSE", url, data, org_id_hint: orgIdHint },
+  });
+}
+
 async function init() {
   const orgId = getOrgIdFromCookie();
-  if (orgId) {
-    await fetchAndSendUsage(orgId);
-  }
+  if (!orgId) return;
+
+  // usage と account を並行取得
+  const [usageData, accountData] = await Promise.all([
+    fetchJSON(`/api/organizations/${orgId}/usage`),
+    fetchJSON("/api/account"),
+  ]);
+
+  // どちらも org_id_hint を付けて「どのアカウントか」を明示する
+  if (usageData) await sendToBackground(`/api/organizations/${orgId}/usage`, usageData, orgId);
+  if (accountData) await sendToBackground("/api/account", accountData, orgId);
 }
 
 if (document.readyState === "loading") {
