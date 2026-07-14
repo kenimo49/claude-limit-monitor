@@ -23,8 +23,8 @@ describe("formatCountdown", () => {
   });
 
   test("過去のタイムスタンプは「リセット済み」を返す", () => {
-    expect(formatCountdown(NOW - 1000)).toBe("✅ リセット済み");
-    expect(formatCountdown(NOW)).toBe("✅ リセット済み");
+    expect(formatCountdown(NOW - 1000)).toBe("リセット済み");
+    expect(formatCountdown(NOW)).toBe("リセット済み");
   });
 
   test("1時間後を正しくフォーマットする", () => {

@@ -157,22 +157,8 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
   }
 
   async function handleDOMData(payload) {
-    const accounts = await getAccounts();
-    const entries = Object.entries(accounts).sort(
-      (a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0)
-    );
-
-    if (entries.length === 0) return;
-
-    const [key, existing] = entries[0];
-    accounts[key] = {
-      ...existing,
-      five_hour_reset_at: payload.reset_at_ms,
-      five_hour_hours_remaining: payload.hours_remaining,
-      last_seen: Date.now(),
-    };
-
-    await chrome.storage.local.set({ [STORAGE_KEY]: accounts });
+    // DOMデータはアカウントを特定できないため、既存アカウントを上書きしない
+    // (handleAPIData で org_id_hint 付きで保存されたデータを信頼する)
   }
 
   async function logUrl(url) {
