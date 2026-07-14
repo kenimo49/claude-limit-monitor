@@ -27,6 +27,11 @@ describe("formatCountdown", () => {
     expect(formatCountdown(NOW)).toBe("リセット済み");
   });
 
+  test("リセット済みはリセット済みと表示する（renderLimit側でstale判定）", () => {
+    // formatCountdown 自体は "リセット済み" を返すだけ
+    expect(formatCountdown(NOW - 3600000)).toBe("リセット済み");
+  });
+
   test("1時間後を正しくフォーマットする", () => {
     expect(formatCountdown(NOW + 3_600_000)).toBe("1時間 0分後");
   });

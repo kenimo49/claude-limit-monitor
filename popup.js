@@ -26,42 +26,55 @@ function formatLastSeen(ms) {
 
 // ---- バー ----
 
-function renderBar(pct) {
+function renderBar(pct, isReset = false) {
   if (pct == null) return "";
   const c = Math.min(100, Math.max(0, Math.round(pct)));
-  const cls = c >= 85 ? "danger" : c >= 55 ? "warning" : "";
+  const cls = isReset ? "stale-bar" : c >= 85 ? "danger" : c >= 55 ? "warning" : "";
+  const label = isReset ? `前回 ${c}%` : `${c}% 使用中`;
   return `
     <div class="bar-wrap">
       <div class="bar-fill ${cls}" style="width:${c}%"></div>
     </div>
-    <div class="bar-label">${c}% 使用中</div>`;
+    <div class="bar-label${isReset ? " stale-label" : ""}">${label}</div>`;
 }
 
-function renderBarAbsolute(used, limit) {
+function renderBarAbsolute(used, limit, isReset = false) {
   if (used == null || !limit) return "";
   const pct = Math.min(100, Math.round((used / limit) * 100));
-  const cls = pct >= 85 ? "danger" : pct >= 55 ? "warning" : "";
+  const cls = isReset ? "stale-bar" : pct >= 85 ? "danger" : pct >= 55 ? "warning" : "";
+  const label = isReset
+    ? `前回 ${used.toLocaleString()} / ${limit.toLocaleString()}`
+    : `${used.toLocaleString()} / ${limit.toLocaleString()} (${pct}%)`;
   return `
     <div class="bar-wrap">
       <div class="bar-fill ${cls}" style="width:${pct}%"></div>
     </div>
-    <div class="bar-label">${used.toLocaleString()} / ${limit.toLocaleString()} (${pct}%)</div>`;
+    <div class="bar-label${isReset ? " stale-label" : ""}">${label}</div>`;
 }
 
 function renderLimit(label, utilization, used, limit, resetAt, hoursRemaining) {
-  const barHtml = utilization != null ? renderBar(utilization) : renderBarAbsolute(used, limit);
+  // リセット済み判定（reset_at が過去）
+  const isReset = resetAt != null && resetAt - Date.now() <= 0;
+
+  const barHtml = utilization != null ? renderBar(utilization, isReset) : renderBarAbsolute(used, limit, isReset);
   const countdown = formatCountdown(resetAt);
   const countdownText = countdown || (hoursRemaining != null ? `約${hoursRemaining}時間後` : null);
-  // utilization が 0% かつ reset 時刻なし → まだ使っていないウィンドウ
-  const isUnused = (utilization === 0 || utilization === null) && !resetAt && !hoursRemaining;
-  const resetDisplay = isUnused
-    ? '<span class="unused">未使用</span>'
-    : countdownText
-      ? `🔄 ${countdownText}`
-      : '<span class="unknown">取得中…</span>';
+
+  const isUnused = !isReset && (utilization === 0 || utilization === null) && !resetAt && !hoursRemaining;
+
+  let resetDisplay;
+  if (isReset) {
+    resetDisplay = '<span class="reset-done">✓ リセット済み</span>';
+  } else if (isUnused) {
+    resetDisplay = '<span class="unused">未使用</span>';
+  } else if (countdownText) {
+    resetDisplay = `🔄 ${countdownText}`;
+  } else {
+    resetDisplay = '<span class="unknown">取得中…</span>';
+  }
 
   return `
-    <div class="limit-block">
+    <div class="limit-block${isReset ? " stale" : ""}">
       <div class="limit-row">
         <span class="limit-title">${label}</span>
         <span class="limit-reset">${resetDisplay}</span>

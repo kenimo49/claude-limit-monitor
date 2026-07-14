@@ -158,8 +158,24 @@ header h1 {
   color: #9ca3af;
 }
 
-.unknown { color: #374151; }
-.unused  { color: #374151; }
+.unknown    { color: #374151; }
+.unused     { color: #374151; }
+.reset-done { color: #22c55e; font-size: 11px; }
+
+/* リセット済みブロック全体を薄くする */
+.limit-block.stale .bar-fill.stale-bar {
+  background: #2d3748;
+}
+.limit-block.stale .bar-label.stale-label {
+  color: #374151;
+  font-style: italic;
+}
+.limit-block.stale .limit-title {
+  color: #374151;
+}
+.limit-block.stale .bar-wrap {
+  opacity: 0.5;
+}
 
 .bar-wrap {
   height: 4px;
