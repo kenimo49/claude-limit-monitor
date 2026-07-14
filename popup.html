@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Claude Limit Monitor</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Claude Limit Monitor</h1>
+    </header>
+
+    <main id="accounts-list">
+      <p class="empty">
+        claude.ai を開いてログインすると<br />アカウント情報が表示されます
+      </p>
+    </main>
+
+    <footer>
+      <button id="clear-btn">すべてクリア</button>
+      <button id="debug-btn">デバッグ</button>
+    </footer>
+
+    <div id="debug-panel" class="hidden">
+      <pre id="debug-output"></pre>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
