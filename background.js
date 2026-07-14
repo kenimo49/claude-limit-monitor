@@ -159,19 +159,11 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
       const orgPrefix = orgId.slice(0, 8);
       const tempKey = `org:${orgPrefix}`;
 
-      // 仮キーがあればデータを吸収してから削除（複合キーが未作成の場合のみ引き継ぎ）
-      if (accounts[tempKey]) {
-        if (!accounts[composite]) {
-          accounts[composite] = { ...accounts[tempKey] };
-        }
+      // 仮キーがあれば composite に引き継ぎ（まだ composite が未作成の場合のみ）
+      // ※ sweep はしない — 同 org の別ユーザー(userId 取れない)の仮キーを消してしまうため
+      if (accounts[tempKey] && !accounts[composite]) {
+        accounts[composite] = { ...accounts[tempKey] };
         delete accounts[tempKey];
-      }
-
-      // 同 org の他の仮キーも掃除（再作成された場合に備えて）
-      for (const k of Object.keys(accounts)) {
-        if (k === `org:${orgPrefix}` && k !== composite) {
-          delete accounts[k];
-        }
       }
 
       key = composite;
