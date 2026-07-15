@@ -2,7 +2,7 @@
 global.chrome = { storage: { local: { get: jest.fn(), remove: jest.fn() } } };
 // document.getElementById が呼ばれないよう render() はexport後にguardされているので問題なし
 
-const { formatCountdown, formatLastSeen, renderBar } = require("../popup");
+const { formatCountdown, formatLastSeen, formatSnapshotTime, renderBar } = require("../popup");
 
 // ---- formatCountdown ----
 
@@ -93,6 +93,24 @@ describe("formatLastSeen", () => {
 
   test("25時間前は「1日前」", () => {
     expect(formatLastSeen(NOW - 25 * 3_600_000)).toBe("1日前");
+  });
+});
+
+// ---- formatSnapshotTime ----
+
+describe("formatSnapshotTime", () => {
+  const NOW = new Date("2026-07-15T15:23:00+09:00").getTime();
+
+  beforeEach(() => jest.spyOn(Date, "now").mockReturnValue(NOW));
+  afterEach(() => jest.restoreAllMocks());
+
+  test("同日は HH:MM のみ", () => {
+    const t = new Date("2026-07-15T09:00:00+09:00").getTime();
+    expect(formatSnapshotTime(t)).toBe("09:00");
+  });
+
+  test("null は「不明」", () => {
+    expect(formatSnapshotTime(null)).toBe("不明");
   });
 });
 

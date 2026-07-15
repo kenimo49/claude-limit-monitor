@@ -24,6 +24,30 @@ function formatLastSeen(ms) {
   return `${Math.floor(h / 24)}日前`;
 }
 
+// スナップショット取得時刻を実時刻で返す
+// 同日: "15:23"、昨日: "昨日 15:23"、それ以前: "7/14 15:23"
+function formatSnapshotTime(ms) {
+  if (!ms) return "不明";
+  const d = new Date(ms);
+  const now = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const time = `${hh}:${mm}`;
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) return time;
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  const isYesterday =
+    d.getFullYear() === yesterday.getFullYear() &&
+    d.getMonth() === yesterday.getMonth() &&
+    d.getDate() === yesterday.getDate();
+  if (isYesterday) return `昨日 ${time}`;
+  return `${d.getMonth() + 1}/${d.getDate()} ${time}`;
+}
+
 // ---- バー ----
 
 function renderBar(pct, isReset = false) {
@@ -68,7 +92,8 @@ function renderLimit(label, utilization, used, limit, resetAt, hoursRemaining) {
   } else if (isUnused) {
     resetDisplay = '<span class="unused">未使用</span>';
   } else if (countdownText) {
-    resetDisplay = `🔄 ${countdownText}`;
+    // 「〜」でスナップショット時点の予測値であることを明示
+    resetDisplay = `〜 ${countdownText}`;
   } else {
     resetDisplay = '<span class="unknown">取得中…</span>';
   }
@@ -105,7 +130,11 @@ function renderAccount(key, acc) {
         <button class="del-btn" title="このアカウントを削除">×</button>
       </div>
     </div>
-    <div class="last-seen">最終確認: ${formatLastSeen(acc.last_seen)}</div>
+    <div class="snapshot-time">
+      <span class="snapshot-icon">◷</span>
+      取得: ${formatSnapshotTime(acc.last_seen)}
+      <span class="snapshot-ago">(${formatLastSeen(acc.last_seen)})</span>
+    </div>
     ${renderLimit("5時間",
       acc.five_hour_utilization ?? null, acc.five_hour_used ?? null,
       acc.five_hour_limit ?? null, acc.five_hour_reset_at ?? null,
@@ -211,5 +240,5 @@ if (typeof document !== "undefined" && document.getElementById) {
 }
 
 if (typeof module !== "undefined") {
-  module.exports = { formatCountdown, formatLastSeen, renderBar };
+  module.exports = { formatCountdown, formatLastSeen, formatSnapshotTime, renderBar };
 }

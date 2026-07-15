@@ -126,10 +126,23 @@ header h1 {
 
 .del-btn:hover { color: #ef4444; }
 
-.last-seen {
+.snapshot-time {
   color: #4b5563;
   font-size: 10px;
   margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.snapshot-icon {
+  font-size: 11px;
+  color: #374151;
+}
+
+.snapshot-ago {
+  color: #374151;
+  font-size: 10px;
 }
 
 /* ---- リミットブロック ---- */
