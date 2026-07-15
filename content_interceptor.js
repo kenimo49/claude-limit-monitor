@@ -1,11 +1,11 @@
 // MAINワールドで動作: fetchを傍受してusage/limit情報を取得する
 // ※ usage と account は content_relay.js のプロアクティブfetchが処理するためスキップ
 (function () {
-  // org スコープのエンドポイントは全て content_relay.js のプロアクティブfetchに任せる
-  // （interceptor が仮キーを作る原因になるため全スキップ）
+  // content_relay.js のプロアクティブfetchが担当するエンドポイントはスキップ
   const SKIP_PATTERNS = [
     /\/api\/organizations\//,
     /\/api\/account\b/,
+    /\/api\/bootstrap\//,  // bootstrap は content_relay.js が直接 fetch する
   ];
 
   const originalFetch = window.fetch;

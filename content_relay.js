@@ -55,14 +55,25 @@ async function init() {
   const orgId = getOrgIdFromCookie();
   if (!orgId) return;
 
-  // ① account を先に取得してユーザーIDを確定する
-  const accountData = await fetchJSON("/api/account");
-  const userId = accountData ? extractUserId(accountData) : null;
-  if (accountData) send("/api/account", accountData, orgId, userId);
+  // ① bootstrap エンドポイントを最初に試す
+  //    profile + usage + userId が1本で取れる（実際に使われているエンドポイント）
+  const bootstrapUrl = `/api/bootstrap/${orgId}/current_user_access`;
+  const bootstrapData = await fetchJSON(bootstrapUrl);
+  const userId = bootstrapData ? extractUserId(bootstrapData) : null;
 
-  // ② usage を取得するとき user_id_hint も添える → 複合キーに直接書き込まれる
+  if (bootstrapData) {
+    send(bootstrapUrl, bootstrapData, orgId, userId);
+    // bootstrap で usage も取れた場合はここで完了
+    if (userId) return;
+  }
+
+  // ② fallback: account → usage の順で取得
+  const accountData = await fetchJSON("/api/account");
+  const fallbackUserId = accountData ? extractUserId(accountData) : userId;
+  if (accountData) send("/api/account", accountData, orgId, fallbackUserId);
+
   const usageData = await fetchJSON(`/api/organizations/${orgId}/usage`);
-  if (usageData) send(`/api/organizations/${orgId}/usage`, usageData, orgId, userId);
+  if (usageData) send(`/api/organizations/${orgId}/usage`, usageData, orgId, fallbackUserId);
 }
 
 // DOMContentLoaded 後に少し待ってから実行（lastActiveOrg cookie 確定を待つ）
