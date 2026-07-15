@@ -168,9 +168,14 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
 
       key = composite;
     } else if (orgId) {
-      // userIDなし → 仮キー（既存の複合キーは絶対に触らない）
-      // /api/account のuserIDが届いたら複合キーに昇格される
-      key = `org:${orgId.slice(0, 8)}`;
+      // userIDなし → 原則仮キー
+      // ただし同じ org の複合キーが 60秒以内に更新されていれば、そちらへ合流
+      // （interceptor キャッチ分がログイン直後の composite へ吸収される）
+      const recentComposite = Object.keys(accounts).find((k) => {
+        if (!k.startsWith(orgId.slice(0, 8) + ":")) return false;
+        return Date.now() - (accounts[k].last_seen || 0) < 60_000;
+      });
+      key = recentComposite || `org:${orgId.slice(0, 8)}`;
     } else {
       // emailだけでは孤立エントリになるのでスキップ
       // (orgIdが必ず取れる設計なのでここには来ないはず)
