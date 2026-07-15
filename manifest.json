@@ -3,7 +3,7 @@
   "name": "Claude Limit Monitor",
   "description": "複数のClaudeアカウントの5時間・週次リミット残量を一元管理",
   "version": "0.1.0",
-  "permissions": ["storage"],
+  "permissions": ["storage", "tabs"],
   "host_permissions": ["https://claude.ai/*"],
   "background": {
     "service_worker": "background.js"

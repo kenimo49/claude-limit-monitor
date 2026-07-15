@@ -246,6 +246,16 @@ footer {
   color: #fca5a5;
 }
 
+.footer-btn.primary {
+  color: #93c5fd;
+  border-color: #1e3a5f;
+}
+
+.footer-btn.primary:hover {
+  background: #1e3a5f;
+  color: #bfdbfe;
+}
+
 /* ---- デバッグパネル ---- */
 
 #debug-panel {

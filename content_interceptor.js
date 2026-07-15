@@ -2,10 +2,10 @@
 // ※ usage と account は content_relay.js のプロアクティブfetchが処理するためスキップ
 (function () {
   // content_relay.js のプロアクティブfetchが担当するエンドポイントはスキップ
+  // bootstrap は Teams プランで usage ページ訪問時に発火するので interceptor でも捕捉する
   const SKIP_PATTERNS = [
     /\/api\/organizations\//,
     /\/api\/account\b/,
-    /\/api\/bootstrap\//,  // bootstrap は content_relay.js が直接 fetch する
   ];
 
   const originalFetch = window.fetch;

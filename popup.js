@@ -231,6 +231,11 @@ async function render() {
 // ---- イベント ----
 
 if (typeof document !== "undefined" && document.getElementById) {
+  document.getElementById("usage-btn").addEventListener("click", () => {
+    chrome.tabs.create({ url: "https://claude.ai/new#settings/usage" });
+    // ページロード後にデータが更新されたら storage.onChanged で自動反映される
+  });
+
   document.getElementById("clear-btn").addEventListener("click", async () => {
     if (!confirm("すべてのアカウントデータを削除しますか？")) return;
     await chrome.storage.local.remove(STORAGE_KEY);
