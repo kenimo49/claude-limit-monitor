@@ -211,9 +211,15 @@ async function render() {
   const list = document.getElementById("accounts-list");
   list.innerHTML = "";
 
-  const entries = Object.entries(accounts).sort(
+  // name（または display_name / email）と user_id の両方がある正常エントリのみ表示
+  const allEntries = Object.entries(accounts).sort(
     (a, b) => (b[1].last_seen || 0) - (a[1].last_seen || 0)
   );
+  const entries = allEntries.filter(([, acc]) => {
+    const hasId   = !!acc.user_id;
+    const hasName = !!(acc.display_name || acc.name || acc.email);
+    return hasId && hasName;
+  });
 
   const countEl = document.getElementById("account-count");
   if (countEl) countEl.textContent = entries.length > 0 ? `${entries.length}` : "";

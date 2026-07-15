@@ -142,11 +142,13 @@ if (typeof chrome !== "undefined" && chrome.runtime) {
   async function handleAPIData({ url, data, org_id_hint, user_id_hint }) {
     const email    = findEmail(data);
     const usage    = findUsage(data);
-    // data内のuserIdが取れなければhintを使う（usage endpointはuserIdを返さない）
     const userId   = findUserId(data) || user_id_hint || null;
     const orgId    = findOrgId(url) || org_id_hint || null;
+    const name     = findName(data);
 
-    if (!email && !usage && !orgId && !userId) return;
+    // orgId だけでは保存しない — usage / userId / name のどれかがないと無意味
+    if (!usage && !userId && !name && !email) return;
+    if (!orgId) return;
 
     const accounts = await getAccounts();
 
