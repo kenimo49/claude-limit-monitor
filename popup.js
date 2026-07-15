@@ -24,6 +24,22 @@ function formatLastSeen(ms) {
   return `${Math.floor(h / 24)}日前`;
 }
 
+// リセット予定時刻を HH:MM で返す（翌日以降は M/D HH:MM）
+function formatResetClock(ms) {
+  if (!ms) return null;
+  const d = new Date(ms);
+  const now = new Date();
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  return sameDay
+    ? `${hh}:${mm}`
+    : `${d.getMonth() + 1}/${d.getDate()} ${hh}:${mm}`;
+}
+
 // スナップショット取得時刻を実時刻で返す
 // 同日: "15:23"、昨日: "昨日 15:23"、それ以前: "7/14 15:23"
 function formatSnapshotTime(ms) {
@@ -92,8 +108,9 @@ function renderLimit(label, utilization, used, limit, resetAt, hoursRemaining) {
   } else if (isUnused) {
     resetDisplay = '<span class="unused">未使用</span>';
   } else if (countdownText) {
-    // 「〜」でスナップショット時点の予測値であることを明示
-    resetDisplay = `〜 ${countdownText}`;
+    const clock = formatResetClock(resetAt);
+    const clockStr = clock ? ` <span class="reset-clock">(${clock})</span>` : "";
+    resetDisplay = `〜 ${countdownText}${clockStr}`;
   } else {
     resetDisplay = '<span class="unknown">取得中…</span>';
   }
